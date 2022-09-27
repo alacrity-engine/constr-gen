@@ -25,8 +25,8 @@ var (
 // arguments passed as flag values.
 func parseFlags() {
 	flag.StringVar(&modulePath, "module",
-		"./module", "Module to generate constructors for")
-	flag.StringVar(&gomodPath, "gomod", ".",
+		"/home/zergon321/go/src/danmaku/bossfight", "Module to generate constructors for")
+	flag.StringVar(&gomodPath, "gomod", "/home/zergon321/go/src/danmaku",
 		"Go module the game module is related to")
 
 	flag.Parse()
@@ -65,7 +65,8 @@ func main() {
 	sourceBuilder := new(strings.Builder)
 	_, err := sourceBuilder.WriteString("package main\n")
 	handleError(err)
-	_, err = sourceBuilder.WriteString("\nimport \"github.com/alacrity-engine/core/ecs\"\n")
+	_, err = sourceBuilder.WriteString("\nimport \"github.com/alacrity-engine/core/engine\"\n")
+	handleError(err)
 
 	// Get all the files and directories of the module.
 	entries, err := ioutil.ReadDir(modulePath)
@@ -109,6 +110,10 @@ func main() {
 				traverseQueue.Enqueue(tracker)
 			}
 
+			continue
+		}
+
+		if !strings.HasSuffix(entry.info.Name(), ".go") {
 			continue
 		}
 
@@ -156,7 +161,7 @@ func main() {
 
 		// Select only the types that are components.
 		for _, typeDecl := range typeDecls {
-			// Find the "ecs.BaseComponent".
+			// Find the "engine.BaseComponent".
 			for _, field := range typeDecl.fieldList {
 				t, ok := field.Type.(*ast.SelectorExpr)
 
@@ -170,7 +175,7 @@ func main() {
 					continue
 				}
 
-				if t.Sel.Name == "BaseComponent" && x.Name == "ecs" {
+				if t.Sel.Name == "BaseComponent" && x.Name == "engine" {
 					comps = append(comps, typeDecl)
 					break
 				}
@@ -196,7 +201,7 @@ func main() {
 	// components found in the source file.
 	for _, comp := range comps {
 		funcSource := "\nfunc New_" + comp.packageName + "_" + comp.typeName +
-			"(name string, params map[string]interface{}) ecs.Component" + "{\n"
+			"(name string, params map[string]interface{}) engine.Component" + "{\n"
 		funcSource += "\tcomp := &" + comp.packageName + "." + comp.typeName + "{\n"
 
 		for _, field := range comp.fieldList {
