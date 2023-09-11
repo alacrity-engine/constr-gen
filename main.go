@@ -5,20 +5,20 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
-	"unicode"
+	"text/template"
 
 	"github.com/golang-collections/collections/queue"
 )
 
 var (
-	modulePath string
-	gomodPath  string
-	importBase string
+	modulePath  string
+	gomodPath   string
+	importBase  string
+	gomodPrefix string
 )
 
 // parseFlags parses the command line
@@ -53,23 +53,15 @@ func getImportBase() {
 
 	gomodPath := path.Dir(gomodDir)
 	importBase = strings.TrimPrefix(moduleDir, gomodPath+"/")
+	gomodPrefix = gomodPath
 }
 
 func main() {
 	parseFlags()
 	getImportBase()
 
-	// Create a string builder
-	// for writing the generated
-	// source code.
-	sourceBuilder := new(strings.Builder)
-	_, err := sourceBuilder.WriteString("package main\n")
-	handleError(err)
-	_, err = sourceBuilder.WriteString("\nimport \"github.com/alacrity-engine/core/engine\"\n")
-	handleError(err)
-
 	// Get all the files and directories of the module.
-	entries, err := ioutil.ReadDir(modulePath)
+	entries, err := os.ReadDir(modulePath)
 	handleError(err)
 	traverseQueue := queue.New()
 
@@ -97,7 +89,7 @@ func main() {
 		if entry.info.IsDir() {
 			// Read the directory for entries.
 			dirName := path.Join(entry.dir, entry.info.Name())
-			entries, err = ioutil.ReadDir(dirName)
+			entries, err = os.ReadDir(dirName)
 			handleError(err)
 
 			// Enqueue them for breadth-first traversal.
@@ -126,9 +118,22 @@ func main() {
 			nil, parser.ParseComments)
 		handleError(err)
 
+		imports := map[string]struct{}{}
+
+		for _, imp := range file.Imports {
+			importPath := imp.Path.Value
+
+			if imp.Name != nil {
+				importPath = imp.Name.Name + " " + importPath
+			}
+
+			imports[importPath] = struct{}{}
+		}
+
 		typeDecls := []TypeDeclaration{}
 		packageName := file.Name.Name
 		packages[packageName] = struct{}{}
+		compPkg := strings.TrimPrefix(entry.dir, gomodPrefix+"/")
 
 		ast.Inspect(file, func(n ast.Node) bool {
 			switch t := n.(type) {
@@ -148,6 +153,7 @@ func main() {
 								packageName: packageName,
 								typeName:    typeName,
 								fieldList:   fieldList,
+								packagePath: compPkg,
 							}
 
 							typeDecls = append(typeDecls, typeDecl)
@@ -176,33 +182,28 @@ func main() {
 				}
 
 				if t.Sel.Name == "BaseComponent" && x.Name == "engine" {
+					typeDecl.imports = imports
 					comps = append(comps, typeDecl)
+
 					break
 				}
 			}
 		}
 	}
 
-	// Write the package imports
-	// to the source builder.
-	for packageName := range packages {
-		if packageName == "main" {
-			continue
+	// Generate template data.
+	templateComps := make([]ComponentTemplateData, 0, len(comps))
+	compPkgs := map[string]struct{}{}
+
+	for _, comp := range comps {
+		templateComp := ComponentTemplateData{
+			Imports: comp.imports,
+			Name:    comp.typeName,
+			PkgPath: comp.packagePath,
+			Fields:  make([]ComponentFieldTemplateData, 0, len(comp.fieldList)),
 		}
 
-		importStr := "import \"" + path.Join(importBase,
-			packageName) + "\"\n"
-
-		_, err = sourceBuilder.WriteString(importStr)
-		handleError(err)
-	}
-
-	// Generate constructors for all the
-	// components found in the source file.
-	for _, comp := range comps {
-		funcSource := "\nfunc New_" + comp.packageName + "_" + comp.typeName +
-			"(name string, params map[string]interface{}) engine.Component" + "{\n"
-		funcSource += "\tcomp := &" + comp.packageName + "." + comp.typeName + "{\n"
+		compPkgs["\""+templateComp.PkgPath+"\""] = struct{}{}
 
 		for _, field := range comp.fieldList {
 			// If the field is unnamed, skip it.
@@ -287,6 +288,24 @@ func main() {
 
 				paramTypeName = x.Name + "." + t.Sel.Name
 
+			// If it's an object.
+			case *ast.StarExpr:
+				switch inner := t.X.(type) {
+				// If it's an internal object.
+				case *ast.Ident:
+					paramTypeName = "*" + inner.Name
+
+				// If it's an external object.
+				case *ast.SelectorExpr:
+					x, ok := inner.X.(*ast.Ident)
+
+					if !ok {
+						continue
+					}
+
+					paramTypeName = "*" + x.Name + "." + inner.Sel.Name
+				}
+
 			default:
 				continue
 			}
@@ -294,43 +313,89 @@ func main() {
 			paramName := field.Names[0].Name
 
 			// If the field is not public, skip it.
-			if !unicode.IsUpper([]rune(paramName)[0]) {
+			if field.Tag == nil || !strings.Contains(field.Tag.Value, `iris:"exported"`) {
 				continue
 			}
 
-			funcSource += "\t\t" + paramName + ": params[\"" +
-				paramName + "\"].(" + paramTypeName + "),\n"
+			field := ComponentFieldTemplateData{
+				Name: paramName,
+				Type: paramTypeName,
+			}
+			templateComp.Fields = append(templateComp.Fields, field)
 		}
 
-		funcSource += "\t}\n\n\tcomp.SetName(name)\n\n\treturn comp\n}\n"
-		_, err = sourceBuilder.WriteString(funcSource)
+		templateComps = append(templateComps, templateComp)
+		_ = templateComps
+	}
+
+	// Write the source files to the
+	// main package of the module.
+	compTemplate := template.New("scene-component.go.tmpl")
+	_, err = compTemplate.Funcs(templateFuncs).
+		ParseFiles("scene-component.go.tmpl")
+	handleError(err)
+
+	for _, templateComp := range templateComps {
+		fpath := path.Join(gomodPrefix, templateComp.PkgPath, "autogen."+templateComp.Name+".go")
+		file, err := os.Create(fpath)
+		handleError(err)
+
+		err = compTemplate.Execute(file, map[string]interface{}{
+			"moduleRootPath":    importBase,
+			"pkgPath":           templateComp.PkgPath,
+			"componentTypeName": templateComp.Name,
+			"fields":            templateComp.Fields,
+			"imports":           templateComp.Imports,
+		})
+		handleError(err)
+
+		err = file.Close()
+		handleError(err)
+
+		// Add missing imports using 'goimports'.
+		editedSource, err := exec.Command("goimports", fpath).Output()
+		handleError(err)
+		// Write the edited source to the autogenerated file.
+		file, err = os.OpenFile(fpath,
+			os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+		handleError(err)
+		_, err = file.WriteString(string(editedSource))
+		handleError(err)
+
+		err = file.Close()
 		handleError(err)
 	}
 
-	// Write the source file to the
-	// main package of the module.
-	autogenFilePath := path.Join(modulePath, "autogenerated.go")
-	autogenFile, err := os.OpenFile(autogenFilePath,
-		os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+	regTemplate := template.New("scene-registry.go.tmpl")
+	_, err = regTemplate.Funcs(templateFuncs).
+		ParseFiles("scene-registry.go.tmpl")
 	handleError(err)
 
-	_, err = autogenFile.WriteString(sourceBuilder.String())
+	fpath := path.Join(modulePath, "registry.go")
+	file, err := os.Create(fpath)
 	handleError(err)
-	err = autogenFile.Close()
+
+	err = regTemplate.Execute(file, map[string]interface{}{
+		"moduleRootPath": importBase,
+		"compTypes":      templateComps,
+		"pkgImports":     compPkgs,
+	})
+	handleError(err)
+
+	err = file.Close()
 	handleError(err)
 
 	// Add missing imports using 'goimports'.
-	editedSource, err := exec.Command("goimports",
-		autogenFilePath).Output()
+	editedSource, err := exec.Command("goimports", fpath).Output()
 	handleError(err)
-
 	// Write the edited source to the autogenerated file.
-	autogenFile, err = os.OpenFile(autogenFilePath,
+	file, err = os.OpenFile(fpath,
 		os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
 	handleError(err)
-	defer autogenFile.Close()
+	_, err = file.WriteString(string(editedSource))
+	handleError(err)
 
-	_, err = autogenFile.WriteString(string(editedSource))
+	err = file.Close()
 	handleError(err)
 }
 

@@ -2,14 +2,14 @@ package main
 
 import (
 	"go/ast"
-	"io/fs"
+	"os"
 )
 
 // FileTracker cotains the info
 // about the file and path to it.
 type FileTracker struct {
 	dir  string
-	info fs.FileInfo
+	info os.DirEntry
 }
 
 // TypeDeclaration contains the
@@ -17,6 +17,20 @@ type FileTracker struct {
 // in the game module.
 type TypeDeclaration struct {
 	packageName string
+	packagePath string
 	typeName    string
 	fieldList   []*ast.Field
+	imports     map[string]struct{}
+}
+
+type ComponentTemplateData struct {
+	Imports map[string]struct{}
+	Name    string
+	PkgPath string
+	Fields  []ComponentFieldTemplateData
+}
+
+type ComponentFieldTemplateData struct {
+	Name string
+	Type string
 }

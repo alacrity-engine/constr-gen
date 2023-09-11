@@ -1,0 +1,28 @@
+package {{ pkgPathBase .moduleRootPath }}
+
+import (
+    "github.com/alacrity-engine/core/scripting"
+    {{ range $import, $_ := .pkgImports }}
+    {{- $import }}
+    {{ end }}
+)
+
+var componentTypeRegistry = map[string]scripting.ComponentTypeEntry{
+{{ range $compType := .compTypes }}
+    "{{ pkgPathSlug $compType.PkgPath }}__{{ $compType.Name }}": scripting.ComponentTypeEntry{
+        Name: "{{ $compType.Name }}",
+        PkgPath: "{{ $compType.PkgPath }}",
+        Constructor: {{ pkgPathBase $compType.PkgPath }}.PUBLIC___{{ pkgPathSlug $compType.PkgPath }}__{{ $compType.Name }}___Create,
+        Fields: map[string]scripting.ComponentTypeFieldEntry{
+        {{ range $compField := $compType.Fields }}
+            "{{ $compField.Name }}": {
+                Name: "{{ $compField.Name }}",
+                Type: "{{ $compField.Type }}",
+                Getter: {{ pkgPathBase $compType.PkgPath }}.PUBLIC___{{ pkgPathSlug $compType.PkgPath }}__{{ $compType.Name }}___Get{{ $compField.Name }},
+                Setter: {{ pkgPathBase $compType.PkgPath }}.PUBLIC___{{ pkgPathSlug $compType.PkgPath }}__{{ $compType.Name }}___Set{{ $compField.Name }},
+            },
+        {{ end }}
+        },
+    },
+{{ end }}
+}

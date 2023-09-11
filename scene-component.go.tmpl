@@ -1,0 +1,23 @@
+package {{ pkgPathBase .pkgPath }}
+
+import (
+    {{ range $import, $_ := .imports }}
+    {{- $import }}
+    {{ end }}
+)
+
+func PUBLIC___{{ pkgPathSlug .pkgPath }}__{{ .componentTypeName }}___Create() engine.Component {
+    return &{{ .componentTypeName }}{}
+}
+
+{{ range $field := .fields }}
+func PUBLIC___{{ pkgPathSlug $.pkgPath }}__{{ $.componentTypeName }}___Get{{ $field.Name }}(comp engine.Component) interface{} {
+    typedComp := comp.(*{{ $.componentTypeName }})
+    return typedComp.{{ $field.Name }}
+}
+
+func PUBLIC___{{ pkgPathSlug $.pkgPath }}__{{ $.componentTypeName }}___Set{{ $field.Name }}(comp engine.Component, value interface{}) {
+    typedComp := comp.(*{{ $.componentTypeName }})
+    typedComp.{{ $field.Name }} = value.({{ $field.Type }})
+}
+{{ end }}
