@@ -26,3 +26,16 @@ var componentTypeRegistry = map[string]scripting.ComponentTypeEntry{
     },
 {{ end }}
 }
+
+func init() {
+    err := scripting.RegisterScene(
+        "{{ pkgPathBase .moduleRootPath }}",
+        componentTypeRegistry)
+    handleError(err)
+}
+
+func handleError(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
