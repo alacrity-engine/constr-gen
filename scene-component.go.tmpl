@@ -6,6 +6,10 @@ import (
     {{ end }}
 )
 
+func (comp *{{ $.componentTypeName }}) TypeID() string {
+    return "{{ pkgPathSlug $.pkgPath }}__{{ $.componentTypeName }}"
+}
+
 func PUBLIC___{{ pkgPathSlug .pkgPath }}__{{ .componentTypeName }}___Create() engine.Component {
     return &{{ .componentTypeName }}{}
 }
