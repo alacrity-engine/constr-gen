@@ -14,6 +14,13 @@ import (
 	"github.com/golang-collections/collections/queue"
 )
 
+// TODO: sometimes a component requires
+// a alice or a map of objects. I think
+// they may be served in a prefab as
+// []interface{} or map[interfac{}]interface{}.
+// I think I need to habdle such cases
+// separately in field setters.
+
 var (
 	modulePath  string
 	gomodPath   string
