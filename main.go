@@ -15,9 +15,9 @@ import (
 )
 
 // TODO: sometimes a component requires
-// a alice or a map of objects. I think
+// a slice or a map of objects. I think
 // they may be served in a prefab as
-// []interface{} or map[interfac{}]interface{}.
+// []interface{} or map[interface{}]interface{}.
 // I think I need to habdle such cases
 // separately in field setters.
 
