@@ -19,7 +19,11 @@ import (
 // they may be served in a prefab as
 // []interface{} or map[interface{}]interface{}.
 // I think I need to habdle such cases
-// separately in field setters.
+// separately in field setters. I think
+// I need to create a list() function for
+// Lua scripts to pass arrays to the Go
+// code as []interface{} instead of
+// map[interface{}]interface{}.
 
 var (
 	modulePath  string
