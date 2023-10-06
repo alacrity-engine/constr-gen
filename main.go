@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"flag"
 	"go/ast"
 	"go/parser"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 	"text/template"
 
@@ -30,6 +32,11 @@ var (
 	gomodPath   string
 	importBase  string
 	gomodPrefix string
+
+	//go:embed scene-component.go.tmpl
+	sceneComponentTmpl string
+	//go:embed scene-registry.go.tmpl
+	sceneRegistryTmpl string
 )
 
 // parseFlags parses the command line
@@ -60,6 +67,12 @@ func getImportBase() {
 	moduleDir, err := os.Getwd()
 	handleError(err)
 	err = os.Chdir(origWD)
+	handleError(err)
+
+	// Make paths absolute.
+	modulePath, err = filepath.Abs(modulePath)
+	handleError(err)
+	gomodPath, err = filepath.Abs(gomodPath)
 	handleError(err)
 
 	gomodPath := path.Dir(gomodDir)
@@ -343,7 +356,7 @@ func main() {
 	// main package of the module.
 	compTemplate := template.New("scene-component.go.tmpl")
 	_, err = compTemplate.Funcs(templateFuncs).
-		ParseFiles("scene-component.go.tmpl")
+		Parse(sceneComponentTmpl)
 	handleError(err)
 
 	for _, templateComp := range templateComps {
@@ -379,7 +392,7 @@ func main() {
 
 	regTemplate := template.New("scene-registry.go.tmpl")
 	_, err = regTemplate.Funcs(templateFuncs).
-		ParseFiles("scene-registry.go.tmpl")
+		Parse(sceneRegistryTmpl)
 	handleError(err)
 
 	fpath := path.Join(modulePath, "registry.go")
