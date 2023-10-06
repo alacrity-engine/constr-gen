@@ -1,19 +1,19 @@
 package {{ pkgPathBase .moduleRootPath }}
 
 import (
-    "github.com/alacrity-engine/core/scripting"
+    "github.com/alacrity-engine/core/engine"
     {{ range $import, $_ := .pkgImports }}
     {{- $import }}
     {{ end }}
 )
 
-var componentTypeRegistry = map[string]scripting.ComponentTypeEntry{
+var componentTypeRegistry = map[string]engine.ComponentTypeEntry{
 {{ range $compType := .compTypes }}
-    "{{ pkgPathSlug $compType.PkgPath }}__{{ $compType.Name }}": scripting.ComponentTypeEntry{
+    "{{ pkgPathSlug $compType.PkgPath }}__{{ $compType.Name }}": engine.ComponentTypeEntry{
         Name: "{{ $compType.Name }}",
         PkgPath: "{{ $compType.PkgPath }}",
         Constructor: {{ pkgPathBase $compType.PkgPath }}.PUBLIC___{{ pkgPathSlug $compType.PkgPath }}__{{ $compType.Name }}___Create,
-        Fields: map[string]scripting.ComponentTypeFieldEntry{
+        Fields: map[string]engine.ComponentTypeFieldEntry{
         {{ range $compField := $compType.Fields }}
             "{{ $compField.Name }}": {
                 Name: "{{ $compField.Name }}",
@@ -28,7 +28,7 @@ var componentTypeRegistry = map[string]scripting.ComponentTypeEntry{
 }
 
 func init() {
-    err := scripting.RegisterScene(
+    err := engine.RegisterScene(
         "{{ pkgPathBase .moduleRootPath }}",
         componentTypeRegistry)
     handleError(err)
