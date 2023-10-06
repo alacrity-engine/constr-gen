@@ -9,7 +9,7 @@ import (
 
 var componentTypeRegistry = map[string]engine.ComponentTypeEntry{
 {{ range $compType := .compTypes }}
-    "{{ pkgPathSlug $compType.PkgPath }}__{{ $compType.Name }}": engine.ComponentTypeEntry{
+    "{{ pkgPathSlug $compType.PkgPath }}__{{ $compType.Name }}": {
         Name: "{{ $compType.Name }}",
         PkgPath: "{{ $compType.PkgPath }}",
         Constructor: {{ pkgPathBase $compType.PkgPath }}.PUBLIC___{{ pkgPathSlug $compType.PkgPath }}__{{ $compType.Name }}___Create,
