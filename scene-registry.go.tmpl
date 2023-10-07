@@ -1,4 +1,4 @@
-package {{ pkgPathBase .moduleRootPath }}
+package {{ pkgPathRoot .moduleRootPath }}
 
 import (
     "github.com/alacrity-engine/core/engine"
@@ -25,13 +25,6 @@ var componentTypeRegistry = map[string]engine.ComponentTypeEntry{
         },
     },
 {{ end }}
-}
-
-func init() {
-    err := engine.RegisterScene(
-        "{{ pkgPathBase .moduleRootPath }}",
-        componentTypeRegistry)
-    handleError(err)
 }
 
 func handleError(err error) {

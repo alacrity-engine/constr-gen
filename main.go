@@ -28,7 +28,6 @@ import (
 // map[interface{}]interface{}.
 
 var (
-	modulePath  string
 	gomodPath   string
 	importBase  string
 	gomodPrefix string
@@ -42,8 +41,6 @@ var (
 // parseFlags parses the command line
 // arguments passed as flag values.
 func parseFlags() {
-	flag.StringVar(&modulePath, "module",
-		"/home/zergon321/go/src/danmaku/bossfight", "Module to generate constructors for")
 	flag.StringVar(&gomodPath, "gomod", "/home/zergon321/go/src/danmaku",
 		"Go module the game module is related to")
 
@@ -62,21 +59,13 @@ func getImportBase() {
 	handleError(err)
 	err = os.Chdir(origWD)
 	handleError(err)
-	err = os.Chdir(modulePath)
-	handleError(err)
-	moduleDir, err := os.Getwd()
-	handleError(err)
-	err = os.Chdir(origWD)
-	handleError(err)
 
 	// Make paths absolute.
-	modulePath, err = filepath.Abs(modulePath)
-	handleError(err)
 	gomodPath, err = filepath.Abs(gomodPath)
 	handleError(err)
 
 	gomodPath := path.Dir(gomodDir)
-	importBase = strings.TrimPrefix(moduleDir, gomodPath+"/")
+	importBase = strings.TrimPrefix(gomodDir, gomodPath+"/")
 	gomodPrefix = gomodPath
 }
 
@@ -85,14 +74,14 @@ func main() {
 	getImportBase()
 
 	// Get all the files and directories of the module.
-	entries, err := os.ReadDir(modulePath)
+	entries, err := os.ReadDir(gomodPath)
 	handleError(err)
 	traverseQueue := queue.New()
 
 	// Enqueue them for breadth-first traversal.
 	for _, entry := range entries {
 		tracker := FileTracker{
-			dir:  modulePath,
+			dir:  gomodPath,
 			info: entry,
 		}
 
@@ -395,7 +384,7 @@ func main() {
 		Parse(sceneRegistryTmpl)
 	handleError(err)
 
-	fpath := path.Join(modulePath, "registry.go")
+	fpath := path.Join(gomodPath, "registry.go")
 	file, err := os.Create(fpath)
 	handleError(err)
 
