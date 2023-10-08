@@ -41,7 +41,7 @@ var (
 // parseFlags parses the command line
 // arguments passed as flag values.
 func parseFlags() {
-	flag.StringVar(&gomodPath, "gomod", "/home/zergon321/go/src/danmaku",
+	flag.StringVar(&gomodPath, "gomod", "/home/zergon321/go/src/test-game",
 		"Go module the game module is related to")
 
 	flag.Parse()
