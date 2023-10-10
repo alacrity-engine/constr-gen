@@ -1,6 +1,9 @@
 package main
 
-import "go/ast"
+import (
+	"go/ast"
+	"strings"
+)
 
 func fieldDefinition(field *ast.Field) (string, string) {
 	// Assume the type of the field.
@@ -105,4 +108,115 @@ func fieldDefinition(field *ast.Field) (string, string) {
 	paramName := field.Names[0].Name
 
 	return paramName, paramTypeName
+}
+
+func parseFieldList(fieldList []*ast.Field) []FieldData {
+	fields := make([]FieldData, 0, len(fieldList))
+
+	for _, field := range fieldList {
+		// If the field is unnamed, skip it.
+		if len(field.Names) <= 0 {
+			continue
+		}
+
+		// If the field is not public, skip it.
+		if field.Tag == nil || !strings.Contains(field.Tag.Value, `iris:"exported"`) {
+			continue
+		}
+
+		paramName, paramTypeName := fieldDefinition(field)
+
+		if paramName == "" || paramTypeName == "" {
+			continue
+		}
+
+		field := FieldData{
+			Name: paramName,
+			Type: paramTypeName,
+		}
+		fields = append(fields, field)
+	}
+
+	return fields
+}
+
+func isComponent(fields []*ast.Field) bool {
+	found := false
+
+	// Find the "engine.BaseComponent".
+	for _, field := range fields {
+		t, ok := field.Type.(*ast.SelectorExpr)
+
+		if !ok {
+			continue
+		}
+
+		x, ok := t.X.(*ast.Ident)
+
+		if !ok {
+			continue
+		}
+
+		if t.Sel.Name == "BaseComponent" && x.Name == "engine" {
+			found = true
+			break
+		}
+	}
+
+	return found
+}
+
+func findComponents(file *ast.File) ([]ComponentData, error) {
+	typeDecls := []ComponentData{}
+
+	ast.Inspect(file, func(n ast.Node) bool {
+		switch t := n.(type) {
+		// Find the type declaration.
+		case *ast.GenDecl:
+			for _, spec := range t.Specs {
+				switch tt := spec.(type) {
+				case *ast.TypeSpec:
+					// Read the type name.
+					typeName := tt.Name.Name
+
+					switch ttt := tt.Type.(type) {
+					case *ast.StructType:
+						// Read the list of type fields.
+						fieldList := ttt.Fields.List
+
+						if !isComponent(fieldList) {
+							continue
+						}
+
+						typeDecl := ComponentData{
+							Name:   typeName,
+							Fields: parseFieldList(fieldList),
+						}
+
+						typeDecls = append(typeDecls, typeDecl)
+					}
+				}
+			}
+		}
+
+		return true
+	})
+
+	return typeDecls, nil
+}
+
+func getImportSet(file *ast.File) map[string]struct{} {
+	imports := map[string]struct{}{}
+
+	for _, imp := range file.Imports {
+		importPath := imp.Path.Value
+
+		if imp.Name != nil {
+			importPath = imp.Name.Name + " " + importPath
+		}
+
+		imports[importPath] = struct{}{}
+	}
+
+	return imports
 }

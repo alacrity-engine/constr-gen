@@ -3,7 +3,6 @@ package main
 import (
 	_ "embed"
 	"flag"
-	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
@@ -91,12 +90,9 @@ func main() {
 		traverseQueue.Enqueue(tracker)
 	}
 
-	// Collect all the package names
-	// to write imports.
-	packages := map[string]struct{}{}
 	// Store all the type declarations
-	// that are Alacrity components.
-	comps := []TypeDeclaration{}
+	// that are Iris components.
+	comps := []ComponentData{}
 
 	for traverseQueue.Len() > 0 {
 		entry := traverseQueue.Dequeue().(FileTracker)
@@ -133,122 +129,21 @@ func main() {
 		file, err := parser.ParseFile(fset, fileName,
 			nil, parser.ParseComments)
 		handleError(err)
-
-		imports := map[string]struct{}{}
-
-		for _, imp := range file.Imports {
-			importPath := imp.Path.Value
-
-			if imp.Name != nil {
-				importPath = imp.Name.Name + " " + importPath
-			}
-
-			imports[importPath] = struct{}{}
-		}
-
-		typeDecls := []TypeDeclaration{}
-		packageName := file.Name.Name
-		packages[packageName] = struct{}{}
+		imports := getImportSet(file)
 		compPkg := strings.TrimPrefix(entry.dir, gomodPrefix+"/")
+		typeDecls, err := findComponents(file)
+		handleError(err)
 
-		ast.Inspect(file, func(n ast.Node) bool {
-			switch t := n.(type) {
-			// Find the type declaration.
-			case *ast.GenDecl:
-				for _, spec := range t.Specs {
-					switch tt := spec.(type) {
-					case *ast.TypeSpec:
-						// Read the type name.
-						typeName := tt.Name.Name
-
-						switch ttt := tt.Type.(type) {
-						case *ast.StructType:
-							// Read the list of type fields.
-							fieldList := ttt.Fields.List
-							typeDecl := TypeDeclaration{
-								packageName: packageName,
-								typeName:    typeName,
-								fieldList:   fieldList,
-								packagePath: compPkg,
-							}
-
-							typeDecls = append(typeDecls, typeDecl)
-						}
-					}
-				}
-			}
-
-			return true
-		})
-
-		// Select only the types that are components.
-		for _, typeDecl := range typeDecls {
-			// Find the "engine.BaseComponent".
-			for _, field := range typeDecl.fieldList {
-				t, ok := field.Type.(*ast.SelectorExpr)
-
-				if !ok {
-					continue
-				}
-
-				x, ok := t.X.(*ast.Ident)
-
-				if !ok {
-					continue
-				}
-
-				if t.Sel.Name == "BaseComponent" && x.Name == "engine" {
-					typeDecl.imports = imports
-					comps = append(comps, typeDecl)
-
-					break
-				}
-			}
+		for i := 0; i < len(typeDecls); i++ {
+			typeDecls[i].PkgPath = compPkg
+			typeDecls[i].Imports = imports
 		}
+
+		comps = append(comps, typeDecls...)
 	}
 
 	// Generate template data.
-	templateComps := make([]ComponentTemplateData, 0, len(comps))
-	compPkgs := map[string]struct{}{}
-
-	for _, comp := range comps {
-		templateComp := ComponentTemplateData{
-			Imports: comp.imports,
-			Name:    comp.typeName,
-			PkgPath: comp.packagePath,
-			Fields:  make([]ComponentFieldTemplateData, 0, len(comp.fieldList)),
-		}
-
-		compPkgs["\""+templateComp.PkgPath+"\""] = struct{}{}
-
-		for _, field := range comp.fieldList {
-			// If the field is unnamed, skip it.
-			if len(field.Names) <= 0 {
-				continue
-			}
-
-			// If the field is not public, skip it.
-			if field.Tag == nil || !strings.Contains(field.Tag.Value, `iris:"exported"`) {
-				continue
-			}
-
-			paramName, paramTypeName := fieldDefinition(field)
-
-			if paramName == "" || paramTypeName == "" {
-				continue
-			}
-
-			field := ComponentFieldTemplateData{
-				Name: paramName,
-				Type: paramTypeName,
-			}
-			templateComp.Fields = append(templateComp.Fields, field)
-		}
-
-		templateComps = append(templateComps, templateComp)
-		_ = templateComps
-	}
-
+	compPkgs := getCompPkgSet(comps)
 	// Write the source files to the
 	// main package of the module.
 	compTemplate := template.New("scene-component.go.tmpl")
@@ -256,17 +151,19 @@ func main() {
 		Parse(sceneComponentTmpl)
 	handleError(err)
 
-	for _, templateComp := range templateComps {
-		fpath := path.Join(gomodPrefix, templateComp.PkgPath, "autogen."+templateComp.Name+".go")
+	for _, comp := range comps {
+		fpath := path.Join(
+			gomodPrefix, comp.PkgPath,
+			"autogen."+comp.Name+".go")
 		file, err := os.Create(fpath)
 		handleError(err)
 
 		err = compTemplate.Execute(file, map[string]interface{}{
 			"moduleRootPath":    importBase,
-			"pkgPath":           templateComp.PkgPath,
-			"componentTypeName": templateComp.Name,
-			"fields":            templateComp.Fields,
-			"imports":           templateComp.Imports,
+			"pkgPath":           comp.PkgPath,
+			"componentTypeName": comp.Name,
+			"fields":            comp.Fields,
+			"imports":           comp.Imports,
 		})
 		handleError(err)
 
@@ -298,7 +195,7 @@ func main() {
 
 	err = regTemplate.Execute(file, map[string]interface{}{
 		"moduleRootPath": importBase,
-		"compTypes":      templateComps,
+		"compTypes":      comps,
 		"pkgImports":     compPkgs,
 	})
 	handleError(err)

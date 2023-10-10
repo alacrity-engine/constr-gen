@@ -1,7 +1,6 @@
 package main
 
 import (
-	"go/ast"
 	"os"
 )
 
@@ -12,25 +11,17 @@ type FileTracker struct {
 	info os.DirEntry
 }
 
-// TypeDeclaration contains the
+// ComponentData contains the
 // information about type declared
 // in the game module.
-type TypeDeclaration struct {
-	packageName string
-	packagePath string
-	typeName    string
-	fieldList   []*ast.Field
-	imports     map[string]struct{}
-}
-
-type ComponentTemplateData struct {
+type ComponentData struct {
 	Imports map[string]struct{}
 	Name    string
 	PkgPath string
-	Fields  []ComponentFieldTemplateData
+	Fields  []FieldData
 }
 
-type ComponentFieldTemplateData struct {
+type FieldData struct {
 	Name string
 	Type string
 }
