@@ -3,28 +3,28 @@ package main
 import (
     "github.com/alacrity-engine/core/engine"
     {{ range $import, $id := .pkgImports }}
-    pkg{{- $id }} {{ $import }}
+    pkg{{ $id }} {{ $import -}}
     {{ end }}
 )
 
 var componentTypeRegistry = map[string]engine.ComponentTypeEntry{
-{{ range $compType := .compTypes }}
+{{- range $compType := .compTypes }}
     "{{ pkgPathSlug $compType.PkgPath }}__{{ $compType.Name }}": {
         Name: "{{ $compType.Name }}",
         PkgPath: "{{ $compType.PkgPath }}",
-        Constructor: {{ pkgPathBase $compType.PkgPath }}.PUBLIC___{{ pkgPathSlug $compType.PkgPath }}__{{ $compType.Name }}___Create,
+        Constructor: pkg{{ index $.pkgImports (printf "\"%s\"" $compType.PkgPath) }}.PUBLIC___{{ pkgPathSlug $compType.PkgPath }}__{{ $compType.Name }}___Create,
         Fields: map[string]engine.ComponentTypeFieldEntry{
-        {{ range $compField := $compType.Fields }}
+        {{- range $compField := $compType.Fields }}
             "{{ $compField.Name }}": {
                 Name: "{{ $compField.Name }}",
                 Type: "{{ $compField.Type }}",
-                Getter: pkg{{ index $.pkgImports $compType.PkgPath }}.PUBLIC___{{ pkgPathSlug $compType.PkgPath }}__{{ $compType.Name }}___Get{{ $compField.Name }},
-                Setter: pkg{{ index $.pkgImports $compType.PkgPath }}.PUBLIC___{{ pkgPathSlug $compType.PkgPath }}__{{ $compType.Name }}___Set{{ $compField.Name }},
+                Getter: pkg{{ index $.pkgImports (printf "\"%s\"" $compType.PkgPath) }}.PUBLIC___{{ pkgPathSlug $compType.PkgPath }}__{{ $compType.Name }}___Get{{ $compField.Name }},
+                Setter: pkg{{ index $.pkgImports (printf "\"%s\"" $compType.PkgPath) }}.PUBLIC___{{ pkgPathSlug $compType.PkgPath }}__{{ $compType.Name }}___Set{{ $compField.Name }},
             },
-        {{ end }}
+        {{- end }}
         },
     },
-{{ end }}
+{{- end }}
 }
 
 func handleError(err error) {
