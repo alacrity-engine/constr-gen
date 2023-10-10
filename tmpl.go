@@ -1,10 +1,10 @@
 package main
 
-func getCompPkgSet(comps []ComponentData) map[string]struct{} {
-	compPkgs := map[string]struct{}{}
+func getCompPkgSet(comps []ComponentData) map[string]int {
+	compPkgs := map[string]int{}
 
-	for _, comp := range comps {
-		compPkgs["\""+comp.PkgPath+"\""] = struct{}{}
+	for i, comp := range comps {
+		compPkgs["\""+comp.PkgPath+"\""] = i
 	}
 
 	return compPkgs
