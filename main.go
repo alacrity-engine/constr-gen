@@ -26,9 +26,6 @@ import (
 // code as []interface{} instead of
 // map[interface{}]interface{}.
 
-// TODO: reference component packages by IDs
-// instead of their actual names in registry.go.
-
 var (
 	gomodPath   string
 	importBase  string
