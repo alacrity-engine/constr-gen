@@ -5,9 +5,12 @@ import (
 	"strings"
 )
 
-func fieldDefinition(field *ast.Field) (string, string) {
+func fieldDefinition(field *ast.Field) FieldData {
 	// Assume the type of the field.
-	var paramTypeName string
+	var (
+		paramTypeName string
+		isArray       bool
+	)
 
 	switch t := field.Type.(type) {
 	// If it's a simple identifier (such as int, float64, etc.).
@@ -16,6 +19,8 @@ func fieldDefinition(field *ast.Field) (string, string) {
 
 	// If it's an array.
 	case *ast.ArrayType:
+		isArray = true
+
 		switch tt := t.Elt.(type) {
 		case *ast.Ident:
 			paramTypeName = "[]" + tt.Name
@@ -24,14 +29,14 @@ func fieldDefinition(field *ast.Field) (string, string) {
 			x, ok := tt.X.(*ast.Ident)
 
 			if !ok {
-				return "", ""
+				return FieldData{}
 			}
 
 			paramTypeName = "[]" + x.Name +
 				"." + tt.Sel.Name
 
 		default:
-			return "", ""
+			return FieldData{}
 		}
 
 	// If it'a map (aka key-value dictionary).
@@ -47,7 +52,7 @@ func fieldDefinition(field *ast.Field) (string, string) {
 			x, ok := tt.X.(*ast.Ident)
 
 			if !ok {
-				return "", ""
+				return FieldData{}
 			}
 
 			keyType = x.Name + "." + tt.Sel.Name
@@ -64,7 +69,7 @@ func fieldDefinition(field *ast.Field) (string, string) {
 			x, ok := tt.X.(*ast.Ident)
 
 			if !ok {
-				return "", ""
+				return FieldData{}
 			}
 
 			valueType = x.Name + "." + tt.Sel.Name
@@ -78,7 +83,7 @@ func fieldDefinition(field *ast.Field) (string, string) {
 		x, ok := t.X.(*ast.Ident)
 
 		if !ok {
-			return "", ""
+			return FieldData{}
 		}
 
 		paramTypeName = x.Name + "." + t.Sel.Name
@@ -95,19 +100,23 @@ func fieldDefinition(field *ast.Field) (string, string) {
 			x, ok := inner.X.(*ast.Ident)
 
 			if !ok {
-				return "", ""
+				return FieldData{}
 			}
 
 			paramTypeName = "*" + x.Name + "." + inner.Sel.Name
 		}
 
 	default:
-		return "", ""
+		return FieldData{}
 	}
 
 	paramName := field.Names[0].Name
 
-	return paramName, paramTypeName
+	return FieldData{
+		Name:    paramName,
+		Type:    paramTypeName,
+		IsArray: isArray,
+	}
 }
 
 func parseFieldList(fieldList []*ast.Field) []FieldData {
@@ -124,16 +133,12 @@ func parseFieldList(fieldList []*ast.Field) []FieldData {
 			continue
 		}
 
-		paramName, paramTypeName := fieldDefinition(field)
+		field := fieldDefinition(field)
 
-		if paramName == "" || paramTypeName == "" {
+		if field.Name == "" || field.Type == "" {
 			continue
 		}
 
-		field := FieldData{
-			Name: paramName,
-			Type: paramTypeName,
-		}
 		fields = append(fields, field)
 	}
 

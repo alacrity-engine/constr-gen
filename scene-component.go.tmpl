@@ -22,6 +22,17 @@ func PUBLIC___{{ pkgPathSlug $.pkgPath }}__{{ $.componentTypeName }}___Get{{ $fi
 
 func PUBLIC___{{ pkgPathSlug $.pkgPath }}__{{ $.componentTypeName }}___Set{{ $field.Name }}(comp engine.Component, value interface{}) {
     typedComp := comp.(*{{ $.componentTypeName }})
+    {{- if $field.IsArray }}
+    arrIn := value.([]interface{})
+    arrTyp := make([]{{ stripArrBrackets $field.Type }}, 0, len(arrIn))
+
+    for i := 0; i < len(arrIn); i++ {
+        arrTyp = append(arrTyp, arrIn[i].({{ stripArrBrackets $field.Type }}))
+    }
+
+    typedComp.{{ $field.Name }} = arrTyp
+    {{- else }}
     typedComp.{{ $field.Name }} = value.({{ $field.Type }})
+    {{ end }}
 }
 {{ end }}

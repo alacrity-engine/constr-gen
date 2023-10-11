@@ -6,9 +6,10 @@ import (
 )
 
 var templateFuncs = template.FuncMap{
-	"pkgPathRoot": pkgPathRoot,
-	"pkgPathSlug": pkgPathSlug,
-	"pkgPathBase": pkgPathBase,
+	"pkgPathRoot":      pkgPathRoot,
+	"pkgPathSlug":      pkgPathSlug,
+	"pkgPathBase":      pkgPathBase,
+	"stripArrBrackets": stripArrBrackets,
 }
 
 func pkgPathRoot(pkgPath string) string {
@@ -40,4 +41,8 @@ func pkgPathBase(pkgPath string) string {
 	parts := strings.Split(pkgPath, "/")
 
 	return parts[len(parts)-1]
+}
+
+func stripArrBrackets(typ string) string {
+	return strings.TrimPrefix(typ, "[]")
 }

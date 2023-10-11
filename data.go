@@ -22,6 +22,7 @@ type ComponentData struct {
 }
 
 type FieldData struct {
-	Name string
-	Type string
+	Name    string
+	IsArray bool
+	Type    string
 }
