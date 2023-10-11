@@ -10,10 +10,12 @@ func fieldDefinition(field *ast.Field) FieldData {
 	var (
 		paramTypeName string
 		isArray       bool
+		isMap         bool
 	)
 
 	switch t := field.Type.(type) {
-	// If it's a simple identifier (such as int, float64, etc.).
+	// If it's a simple identifier
+	// (such as int, float64, etc.).
 	case *ast.Ident:
 		paramTypeName = t.Name
 
@@ -35,12 +37,30 @@ func fieldDefinition(field *ast.Field) FieldData {
 			paramTypeName = "[]" + x.Name +
 				"." + tt.Sel.Name
 
+		case *ast.StarExpr:
+			switch inner := tt.X.(type) {
+			// If it's an internal object.
+			case *ast.Ident:
+				paramTypeName = "[]*" + inner.Name
+
+			// If it's an external object.
+			case *ast.SelectorExpr:
+				x, ok := inner.X.(*ast.Ident)
+
+				if !ok {
+					return FieldData{}
+				}
+
+				paramTypeName = "[]*" + x.Name + "." + inner.Sel.Name
+			}
+
 		default:
 			return FieldData{}
 		}
 
 	// If it'a map (aka key-value dictionary).
 	case *ast.MapType:
+		isMap = true
 		// Assume the type of map key.
 		var keyType string
 
@@ -56,6 +76,23 @@ func fieldDefinition(field *ast.Field) FieldData {
 			}
 
 			keyType = x.Name + "." + tt.Sel.Name
+
+		case *ast.StarExpr:
+			switch inner := tt.X.(type) {
+			// If it's an internal object.
+			case *ast.Ident:
+				keyType = "*" + inner.Name
+
+			// If it's an external object.
+			case *ast.SelectorExpr:
+				x, ok := inner.X.(*ast.Ident)
+
+				if !ok {
+					return FieldData{}
+				}
+
+				keyType = "*" + x.Name + "." + inner.Sel.Name
+			}
 		}
 
 		// Assume the type of map value.
@@ -73,6 +110,23 @@ func fieldDefinition(field *ast.Field) FieldData {
 			}
 
 			valueType = x.Name + "." + tt.Sel.Name
+
+		case *ast.StarExpr:
+			switch inner := tt.X.(type) {
+			// If it's an internal object.
+			case *ast.Ident:
+				valueType = "*" + inner.Name
+
+			// If it's an external object.
+			case *ast.SelectorExpr:
+				x, ok := inner.X.(*ast.Ident)
+
+				if !ok {
+					return FieldData{}
+				}
+
+				valueType = "*" + x.Name + "." + inner.Sel.Name
+			}
 		}
 
 		paramTypeName = "map[" + keyType + "]" + valueType
@@ -116,6 +170,7 @@ func fieldDefinition(field *ast.Field) FieldData {
 		Name:    paramName,
 		Type:    paramTypeName,
 		IsArray: isArray,
+		IsMap:   isMap,
 	}
 }
 

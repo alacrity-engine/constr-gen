@@ -24,13 +24,22 @@ func PUBLIC___{{ pkgPathSlug $.pkgPath }}__{{ $.componentTypeName }}___Set{{ $fi
     typedComp := comp.(*{{ $.componentTypeName }})
     {{- if $field.IsArray }}
     arrIn := value.([]interface{})
-    arrTyp := make([]{{ stripArrBrackets $field.Type }}, 0, len(arrIn))
+    arrTyp := make({{ $field.Type }}, 0, len(arrIn))
 
     for i := 0; i < len(arrIn); i++ {
-        arrTyp = append(arrTyp, arrIn[i].({{ stripArrBrackets $field.Type }}))
+        arrTyp = append(arrTyp, arrIn[i].({{ arrItemType $field.Type }}))
     }
 
     typedComp.{{ $field.Name }} = arrTyp
+    {{- else if $field.IsMap }}
+    mapIn := value.(map[interface{}]interface{})
+    mapTyp := make({{ $field.Type }}, len(mapIn))
+
+    for key, val := range mapIn {
+        mapTyp[key.({{ mapKeyType $field.Type }})] = val.({{ mapValueType $field.Type }})
+    }
+
+    typedComp.{{ $field.Name }} = mapTyp
     {{- else }}
     typedComp.{{ $field.Name }} = value.({{ $field.Type }})
     {{ end }}

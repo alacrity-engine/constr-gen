@@ -24,5 +24,6 @@ type ComponentData struct {
 type FieldData struct {
 	Name    string
 	IsArray bool
+	IsMap   bool
 	Type    string
 }
